@@ -8,6 +8,9 @@ app = Flask(__name__)
 #Load the model
 rand_model=pickle.load(open('randmodel.pkl','rb'))
 scaler = pickle.load(open('scaling.pkl','rb'))
+# encoders = pickle.load(open('encoders.pkl', 'rb'))
+with open('encoders.pkl', 'rb') as file:
+    encoders = pickle.load(file)
 
 @app.route('/')
 def home():
@@ -15,13 +18,33 @@ def home():
 
 @app.route('/predict_api',methods = ['POST'])
 def predict_api():
-    data=request.json['data']
-    print(data)
-    print(np.array(list(data.values())).reshape(1,-1))
-    new_data=scaler.transform(np.array(list(data.values())).reshape(1,-1))
-    output=rand_model.predict(new_data)
-    print(output[0])
-    return jsonify(output[0])
+    data = request.json['data']
+    print(f"Original input data: {data}")
+    
+    # Convert the input JSON data to a DataFrame
+    df = pd.DataFrame([data])
+
+    # Apply LabelEncoders to the categorical columns
+    for column, encoder in encoders.items():
+        df[column] = encoder.transform(df[column])
+    
+    print(f"Data after encoding: \n{df}")
+    
+    # Convert the DataFrame to a numpy array and reshape it
+    input_array = df.values.reshape(1, -1)
+    
+    print(f"Data after reshaping: {input_array}")
+    
+    # Scale the input data
+    new_data = scaler.transform(input_array)
+    print(f"Data after scaling: {new_data}")
+    
+    # Predict using the pre-trained model
+    output = rand_model.predict(new_data)
+    print(f"Model output: {output[0]}")
+    
+    # Return the prediction as a JSON response
+    return jsonify({'prediction': int(output[0])})
 
 
 if __name__=="__main__":
